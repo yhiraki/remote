@@ -30,12 +30,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(path)
 	cwd, err := filepath.Rel(os.Getenv("HOME"), path)
-	fmt.Println(cwd)
 
 	fmt.Printf("Connecting to %s\n", host)
-	cmd := exec.Command("ssh", host, "-t", fmt.Sprintf("cd %s && bash", cwd))
+	cmd := exec.Command("ssh", host, "-t", fmt.Sprintf("cd %s; exec $SHELL", cwd))
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
