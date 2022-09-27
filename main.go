@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -45,27 +46,40 @@ func main() {
 	}
 	defer fp.Close()
 
-	// TODO: remote IP 情報をキャッシュしたい
-	// cacheFile := filepath.Join(home, ".cache/remote/hostname")
-	// if _, err := os.Stat(cacheFile); err != nil {
-	// 	_, err := os.Create(cacheFile)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// }
+	// get remote hostname and cache
+	cacheFile := filepath.Join(cacheDir, "hostname")
+	if _, err := os.Stat(cacheFile); err != nil {
+		f, err := os.Create(cacheFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
 
-	// get remote hostname
-	buf := make([]byte, 1024)
-	_, err = fp.Read(buf)
-	if err != nil {
-		panic(err)
+		// get remote hostname
+		buf := make([]byte, 1024)
+		_, err = fp.Read(buf)
+		if err != nil {
+			panic(err)
+		}
+		shcmd := strings.Split(string(buf), "\n")[0]
+		out, err := exec.Command("sh", "-c", shcmd).Output()
+		if err != nil {
+			panic(err)
+		}
+		f.WriteString(strings.TrimSuffix(string(out), "\n"))
 	}
-	shcmd := strings.Split(string(buf), "\n")[0]
-	out, err := exec.Command("sh", "-c", shcmd).Output()
+
+	// get cached remote hostname
+	f, err := os.Open(cacheFile)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-	host := strings.TrimSuffix(string(out), "\n")
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	if !sc.Scan() {
+		log.Fatal("Host not cached")
+	}
+	host := string(sc.Text())
 
 	// get relative current path
 	path, err := os.Getwd()
@@ -77,7 +91,7 @@ func main() {
 	// build command args
 	arg := make([]string, 0)
 	if len(os.Args) == 1 {
-		arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, "bash"))
+		arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, "$SHELL"))
 	} else if os.Args[1] == "sh" {
 		arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, strings.Join(os.Args[2:], " ")))
 	} else {
@@ -87,6 +101,7 @@ func main() {
 	// ssh connect
 	fmt.Printf("Connecting to %s\n", host)
 	cmd := exec.Command("ssh", arg...)
+	fmt.Println(cmd.Args)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
