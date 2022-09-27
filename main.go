@@ -46,8 +46,18 @@ func main() {
 	}
 	cwd, err := filepath.Rel(home, path)
 
+	fmt.Println(os.Args[1:])
+	arg := make([]string, 0)
+	if len(os.Args) == 1 {
+		arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, "bash"))
+	} else if os.Args[1] == "sh" {
+		arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, strings.Join(os.Args[2:], " ")))
+	} else {
+		log.Fatal("Arg is not allowed")
+	}
+
 	fmt.Printf("Connecting to %s\n", host)
-	cmd := exec.Command("ssh", host, "-t", fmt.Sprintf("cd %s; exec $SHELL", cwd))
+	cmd := exec.Command("ssh", arg...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
