@@ -2,19 +2,32 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
 
-var home string
+var (
+	home     string
+	cacheDir string
+)
 
 func init() {
 	var err error
+
 	home, err = os.UserHomeDir()
 	if err != nil {
 		panic(err)
+	}
+
+	cacheDir = filepath.Join(home, ".cache/remote")
+	_, err = os.Stat(cacheDir)
+	if err != nil {
+		if err = os.MkdirAll(cacheDir, 0o705); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -32,21 +45,36 @@ func main() {
 	}
 	defer fp.Close()
 
+	// TODO: remote IP 情報をキャッシュしたい
+	// cacheFile := filepath.Join(home, ".cache/remote/hostname")
+	// if _, err := os.Stat(cacheFile); err != nil {
+	// 	_, err := os.Create(cacheFile)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// }
+
+	// get remote hostname
 	buf := make([]byte, 1024)
 	_, err = fp.Read(buf)
 	if err != nil {
 		panic(err)
 	}
 	shcmd := strings.Split(string(buf), "\n")[0]
-	host := getHostname(shcmd)
+	out, err := exec.Command("sh", "-c", shcmd).Output()
+	if err != nil {
+		panic(err)
+	}
+	host := strings.TrimSuffix(string(out), "\n")
 
+	// get relative current path
 	path, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
 	cwd, err := filepath.Rel(home, path)
 
-	fmt.Println(os.Args[1:])
+	// build command args
 	arg := make([]string, 0)
 	if len(os.Args) == 1 {
 		arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, "bash"))
@@ -56,6 +84,7 @@ func main() {
 		log.Fatal("Arg is not allowed")
 	}
 
+	// ssh connect
 	fmt.Printf("Connecting to %s\n", host)
 	cmd := exec.Command("ssh", arg...)
 	cmd.Stdin = os.Stdin
@@ -66,22 +95,4 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func getHostname(shcmd string) (host string) {
-	// TODO: remote IP 情報をキャッシュしたい
-	// cacheFile := filepath.Join(home, ".cache/remote/hostname")
-	// if _, err := os.Stat(cacheFile); err != nil {
-	// 	_, err := os.Create(cacheFile)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// }
-	cmd := exec.Command("sh", "-c", shcmd)
-	out, err := cmd.Output()
-	if err != nil {
-		panic(err)
-	}
-	host = strings.TrimSuffix(string(out), "\n")
-	return
 }
