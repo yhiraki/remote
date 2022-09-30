@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var (
@@ -47,8 +48,11 @@ func main() {
 	defer fp.Close()
 
 	// get remote hostname and cache
+	timeBeforCacheExpies := 24 * time.Hour
 	cacheFile := filepath.Join(cacheDir, "hostname")
-	if _, err := os.Stat(cacheFile); err != nil {
+	cacheFileState, err := os.Stat(cacheFile)
+	isCacheExpired := cacheFileState.ModTime().Add(timeBeforCacheExpies).Before(time.Now())
+	if err != nil || isCacheExpired {
 		f, err := os.Create(cacheFile)
 		if err != nil {
 			log.Fatal(err)
