@@ -51,7 +51,10 @@ func main() {
 	timeBeforCacheExpies := 24 * time.Hour
 	cacheFile := filepath.Join(cacheDir, "hostname")
 	cacheFileState, err := os.Stat(cacheFile)
-	isCacheExpired := cacheFileState.ModTime().Add(timeBeforCacheExpies).Before(time.Now())
+	isCacheExpired := true
+	if err == nil {
+		isCacheExpired = cacheFileState.ModTime().Add(timeBeforCacheExpies).Before(time.Now())
+	}
 	if err != nil || isCacheExpired {
 		f, err := os.Create(cacheFile)
 		if err != nil {
@@ -103,15 +106,23 @@ func main() {
 	}
 
 	// ssh connect
-	fmt.Printf("Connecting to %s\n", host)
-	cmd := exec.Command("ssh", arg...)
-	fmt.Println(cmd.Args)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err = cmd.Run()
-	if err != nil {
-		panic(err)
+	waitSeconds := 1
+	maxRetry := 3
+	for i := 0; i <= maxRetry; i++ {
+		if i > 0 {
+			log.Printf("%s\nRetry after %d seconds.", err, waitSeconds)
+			time.Sleep(time.Second * time.Duration(waitSeconds))
+			waitSeconds *= 2
+		}
+		cmd := exec.Command("ssh", arg...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		fmt.Println(cmd.Args)
+		fmt.Printf("Connecting to %s\n", host)
+		if err = cmd.Run(); err != nil {
+			continue
+		}
+		break
 	}
 }
