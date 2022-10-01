@@ -96,13 +96,25 @@ func main() {
 	cwd, err := filepath.Rel(home, path)
 
 	// build command args
+	var cmd string
 	arg := make([]string, 0)
 	if len(os.Args) == 1 {
+		cmd = "ssh"
 		arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, "$SHELL"))
-	} else if os.Args[1] == "sh" {
-		arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, strings.Join(os.Args[2:], " ")))
 	} else {
-		log.Fatal("Arg is not allowed")
+		switch os.Args[1] {
+		case "sh":
+			cmd = "ssh"
+			arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, strings.Join(os.Args[2:], " ")))
+		case "push":
+			cmd = "rsync"
+			arg = append(arg, "-av", ".", fmt.Sprintf("%s:%s", host, cwd))
+		case "pull":
+			cmd = "rsync"
+			arg = append(arg, "-av", fmt.Sprintf("%s:%s", host, cwd), "..")
+		default:
+			log.Fatal("Arg is not allowed")
+		}
 	}
 
 	// ssh connect
@@ -114,7 +126,7 @@ func main() {
 			time.Sleep(time.Second * time.Duration(waitSeconds))
 			waitSeconds *= 2
 		}
-		cmd := exec.Command("ssh", arg...)
+		cmd := exec.Command(cmd, arg...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
