@@ -34,10 +34,9 @@ func init() {
 }
 
 func main() {
-	var err error
 	// ~/.config/remote/conf にIPを取得するためのコマンドを記載する
 	configFile := filepath.Join(home, ".config", "remote", "conf")
-	_, err = os.Stat(configFile)
+	_, err := os.Stat(configFile)
 	if err != nil {
 		panic(err)
 	}
@@ -94,6 +93,9 @@ func main() {
 		panic(err)
 	}
 	cwd, err := filepath.Rel(home, path)
+	if err != nil {
+		panic(err)
+	}
 
 	// build command args
 	var cmd string
