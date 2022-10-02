@@ -110,10 +110,19 @@ func main() {
 			arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, strings.Join(os.Args[2:], " ")))
 		case "push":
 			cmd = "rsync"
-			arg = append(arg, "-av", ".", fmt.Sprintf("%s:%s", host, cwd))
+			dir := os.Args[2]
+			if fileInfo, err := os.Stat(os.Args[2]); err != nil {
+				log.Fatal(err)
+			} else if !fileInfo.IsDir() {
+				log.Fatal(fmt.Sprintf("%q is not directory.", fileInfo.Name()))
+			}
+			remoteDir := filepath.Join(cwd, dir)
+			arg = append(arg, "-av", dir+"/", fmt.Sprintf("%s:%s", host, remoteDir))
 		case "pull":
 			cmd = "rsync"
-			arg = append(arg, "-av", fmt.Sprintf("%s:%s", host, cwd), "..")
+			dir := os.Args[2]
+			remoteDir := filepath.Join(cwd, dir)
+			arg = append(arg, "-av", "--ignore-existing", fmt.Sprintf("%s:%s", host, remoteDir+"/"), dir)
 		default:
 			log.Fatal("Arg is not allowed")
 		}
