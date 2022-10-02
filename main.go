@@ -115,7 +115,7 @@ func main() {
 			if file[0] != '/' {
 				remoteFile = filepath.Join(cwd, file)
 			}
-			if fileStat, err := os.Stat(os.Args[2]); err != nil {
+			if fileStat, err := os.Stat(file); err != nil {
 				log.Fatal(err)
 			} else if fileStat.IsDir() && file[len(file)-1] != '/' {
 				file += "/"
@@ -125,8 +125,13 @@ func main() {
 		case "pull":
 			cmd = "rsync"
 			file := os.Args[2]
-			// TODO: remote fileがdirかを判断して / を付与する
 			remoteFile := file
+			if fileStat, err := os.Stat(file); err == nil {
+				if fileStat.IsDir() && file[len(file)-1] != '/' {
+					file += "/"
+					remoteFile += "/"
+				}
+			}
 			arg = append(arg, "-av", "--ignore-existing", fmt.Sprintf("%s:%s", host, remoteFile), file)
 		default:
 			log.Fatal("Arg is not allowed")
