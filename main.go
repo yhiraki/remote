@@ -126,6 +126,9 @@ func main() {
 			cmd = "rsync"
 			file := os.Args[2]
 			remoteFile := file
+			if file[0] != '/' {
+				remoteFile = filepath.Join(cwd, file)
+			}
 			if fileStat, err := os.Stat(file); err == nil {
 				if fileStat.IsDir() && file[len(file)-1] != '/' {
 					file += "/"
