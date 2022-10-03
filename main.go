@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -45,6 +47,10 @@ func main() {
 		panic(err)
 	}
 	defer fp.Close()
+
+	// command line parsing
+	isDryRun := flag.Bool("dry-run", false, "dry run")
+	flag.Parse()
 
 	// get remote hostname and cache
 	timeBeforCacheExpies := 24 * time.Hour
@@ -98,47 +104,51 @@ func main() {
 	}
 
 	// build command args
-	var cmd string
-	arg := make([]string, 0)
-	if len(os.Args) == 1 {
-		cmd = "ssh"
-		arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, "$SHELL"))
-	} else {
-		switch os.Args[1] {
-		case "sh":
-			cmd = "ssh"
-			arg = append(arg, host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, strings.Join(os.Args[2:], " ")))
-		case "push":
-			cmd = "rsync"
-			file := os.Args[2]
-			remoteFile := file
-			if file[0] != '/' {
-				remoteFile = filepath.Join(cwd, file)
-			}
-			if fileStat, err := os.Stat(file); err != nil {
-				log.Fatal(err)
-			} else if fileStat.IsDir() && file[len(file)-1] != '/' {
-				file += "/"
+	cmd, cmdArg, err := func(args []string) (string, []string, error) {
+		// ssh
+
+		if len(args) == 0 {
+			return "ssh", []string{host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, "$SHELL")}, nil
+		}
+
+		subCmd := args[0]
+
+		if subCmd == "sh" {
+			return "ssh", []string{host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, strings.Join(args[1:], " "))}, nil
+		}
+
+		// rsync
+
+		localFile := args[1]
+		remoteFile := localFile
+		if localFile[0] != '/' {
+			remoteFile = filepath.Join(cwd, localFile)
+		}
+		localFileStat, err := os.Stat(localFile)
+		localFileExists := false
+		if err == nil {
+			if localFileStat.IsDir() && localFile[len(localFile)-1] != '/' {
+				localFile += "/"
 				remoteFile += "/"
 			}
-			arg = append(arg, "-av", file, fmt.Sprintf("%s:%s", host, remoteFile))
-		case "pull":
-			cmd = "rsync"
-			file := os.Args[2]
-			remoteFile := file
-			if file[0] != '/' {
-				remoteFile = filepath.Join(cwd, file)
-			}
-			if fileStat, err := os.Stat(file); err == nil {
-				if fileStat.IsDir() && file[len(file)-1] != '/' {
-					file += "/"
-					remoteFile += "/"
-				}
-			}
-			arg = append(arg, "-av", "--ignore-existing", fmt.Sprintf("%s:%s", host, remoteFile), file)
-		default:
-			log.Fatal("Arg is not allowed")
+			localFileExists = true
 		}
+
+		if subCmd == "push" {
+			if !localFileExists {
+				return "", nil, errors.New(fmt.Sprintf("File not found: %q", localFile))
+			}
+			return "rsync", []string{"-av", localFile, fmt.Sprintf("%s:%s", host, remoteFile)}, nil
+		}
+
+		if subCmd == "pull" {
+			return "rsync", []string{"-av", "--ignore-existing", fmt.Sprintf("%s:%s", host, remoteFile), localFile}, nil
+		}
+
+		return "", nil, errors.New(fmt.Sprintf("%q is not command", subCmd))
+	}(flag.Args())
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	// ssh connect
@@ -150,13 +160,16 @@ func main() {
 			time.Sleep(time.Second * time.Duration(waitSeconds))
 			waitSeconds *= 2
 		}
-		cmd := exec.Command(cmd, arg...)
+		cmd := exec.Command(cmd, cmdArg...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		fmt.Println(cmd.Args)
+		if *isDryRun {
+			break
+		}
 		fmt.Printf("Connecting to %s\n", host)
-		if err = cmd.Run(); err != nil {
+		if err := cmd.Run(); err != nil {
 			continue
 		}
 		break
