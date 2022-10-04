@@ -133,16 +133,22 @@ func main() {
 			}
 			localFileExists = true
 		}
+		rsyncArgs := make([]string, 0, 8)
+		rsyncOptions := []string{"--exclude", "node_modules", "--exclude", ".venv"}
 
 		if subCmd == "push" {
 			if !localFileExists {
 				return "", nil, errors.New(fmt.Sprintf("File not found: %q", localFile))
 			}
-			return "rsync", []string{"-av", localFile, fmt.Sprintf("%s:%s", host, remoteFile)}, nil
+			rsyncArgs = append(rsyncArgs, "-av", localFile, fmt.Sprintf("%s:%s", host, remoteFile))
+			rsyncArgs = append(rsyncArgs, rsyncOptions...)
+			return "rsync", rsyncArgs, nil
 		}
 
 		if subCmd == "pull" {
-			return "rsync", []string{"-av", "--ignore-existing", fmt.Sprintf("%s:%s", host, remoteFile), localFile}, nil
+			rsyncArgs = append(rsyncArgs, "-av", "--ignore-existing", fmt.Sprintf("%s:%s", host, remoteFile), localFile)
+			rsyncArgs = append(rsyncArgs, rsyncOptions...)
+			return "rsync", rsyncArgs, nil
 		}
 
 		return "", nil, errors.New(fmt.Sprintf("%q is not command", subCmd))
