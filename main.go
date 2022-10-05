@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -17,6 +18,12 @@ var (
 	home     string
 	cacheDir string
 )
+
+type Config struct {
+	Hostname        string   `json:"hostname"`
+	HostnameCommand string   `json:"hostnameCommand"`
+	ExcludeFiles    []string `json:"excludeFiles"`
+}
 
 func init() {
 	var err error
@@ -35,26 +42,28 @@ func init() {
 	}
 }
 
-func main() {
-	// ~/.config/remote/conf にIPを取得するためのコマンドを記載する
-	configFile := filepath.Join(home, ".config", "remote", "conf")
+func parseConfigFile(config *Config) {
+	configFile := filepath.Join(home, ".config", "remote", "remoterc.json")
 	_, err := os.Stat(configFile)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	fp, err := os.Open(configFile)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	defer fp.Close()
 
-	// command line parsing
-	isDryRun := flag.Bool("dry-run", false, "dry run")
-	flag.Parse()
+	if err := json.NewDecoder(fp).Decode(&config); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(config)
+}
 
+func getRemoteHostname(cmd string) (host string) {
 	// get remote hostname and cache
 	timeBeforCacheExpies := 24 * time.Hour
-	cacheFile := filepath.Join(cacheDir, "hostname")
+	cacheFile := filepath.Join(cacheDir, "hostname") // TODO: config file の場所によって変える
 	cacheFileState, err := os.Stat(cacheFile)
 	isCacheExpired := true
 	if err == nil {
@@ -68,12 +77,7 @@ func main() {
 		defer f.Close()
 
 		// get remote hostname
-		buf := make([]byte, 1024)
-		_, err = fp.Read(buf)
-		if err != nil {
-			panic(err)
-		}
-		shcmd := strings.Split(string(buf), "\n")[0]
+		shcmd := strings.Split(cmd, "\n")[0]
 		out, err := exec.Command("sh", "-c", shcmd).Output()
 		if err != nil {
 			panic(err)
@@ -91,16 +95,33 @@ func main() {
 	if !sc.Scan() {
 		log.Fatal("Host not cached")
 	}
-	host := string(sc.Text())
+
+	host = string(sc.Text())
+	return
+}
+
+func main() {
+	var config Config
+	parseConfigFile(&config)
+
+	// command line parsing
+	isDryRun := flag.Bool("dry-run", false, "dry run")
+	flag.Parse()
+
+	// get hostname
+	host := config.Hostname
+	if config.HostnameCommand != "" {
+		host = getRemoteHostname(config.HostnameCommand)
+	}
 
 	// get relative current path
 	path, err := os.Getwd()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	cwd, err := filepath.Rel(home, path)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// build command args
