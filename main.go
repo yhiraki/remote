@@ -16,6 +16,7 @@ import (
 
 var (
 	home     string
+	cwd      string
 	cacheDir string
 )
 
@@ -30,23 +31,36 @@ func init() {
 
 	home, err = os.UserHomeDir()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
+	}
+
+	cwd, err = os.Getwd()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	cacheDir = filepath.Join(home, ".cache/remote")
 	_, err = os.Stat(cacheDir)
 	if err != nil {
 		if err = os.MkdirAll(cacheDir, 0o705); err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 	}
 }
 
 func parseConfigFile(config *Config) {
-	configFile := filepath.Join(home, ".config", "remote", "remoterc.json")
-	_, err := os.Stat(configFile)
-	if err != nil {
-		log.Fatal(err)
+	configName := ".remoterc.json"
+	configFile := filepath.Join(home, ".config", "remote", configName)
+	wd := strings.Split(cwd, "/")
+	for ; len(wd) > 0; wd = wd[:len(wd)-1] {
+		path := filepath.Join(wd...)
+		path = filepath.Join("/", path, configName)
+		if s, err := os.Stat(path); err != nil {
+			continue
+		} else if !s.IsDir() {
+			configFile = path
+		}
+		break
 	}
 	fp, err := os.Open(configFile)
 	if err != nil {
@@ -57,7 +71,6 @@ func parseConfigFile(config *Config) {
 	if err := json.NewDecoder(fp).Decode(&config); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(config)
 }
 
 func getRemoteHostname(cmd string) (host string) {
@@ -80,7 +93,7 @@ func getRemoteHostname(cmd string) (host string) {
 		shcmd := strings.Split(cmd, "\n")[0]
 		out, err := exec.Command("sh", "-c", shcmd).Output()
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 		f.WriteString(strings.TrimSuffix(string(out), "\n"))
 	}
@@ -115,11 +128,7 @@ func main() {
 	}
 
 	// get relative current path
-	path, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	cwd, err := filepath.Rel(home, path)
+	cwdRel, err := filepath.Rel(home, cwd)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -129,13 +138,13 @@ func main() {
 		// ssh
 
 		if len(args) == 0 {
-			return "ssh", []string{host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, "$SHELL")}, nil
+			return "ssh", []string{host, "-t", fmt.Sprintf("cd %s; exec %s", cwdRel, "$SHELL")}, nil
 		}
 
 		subCmd := args[0]
 
 		if subCmd == "sh" {
-			return "ssh", []string{host, "-t", fmt.Sprintf("cd %s; exec %s", cwd, strings.Join(args[1:], " "))}, nil
+			return "ssh", []string{host, "-t", fmt.Sprintf("cd %s; exec %s", cwdRel, strings.Join(args[1:], " "))}, nil
 		}
 
 		// rsync
@@ -143,7 +152,7 @@ func main() {
 		localFile := args[1]
 		remoteFile := localFile
 		if localFile[0] != '/' {
-			remoteFile = filepath.Join(cwd, localFile)
+			remoteFile = filepath.Join(cwdRel, localFile)
 		}
 		localFileStat, err := os.Stat(localFile)
 		localFileExists := false
@@ -191,11 +200,10 @@ func main() {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		fmt.Println(cmd.Args)
 		if *isDryRun {
+			fmt.Println(cmd.Args)
 			break
 		}
-		fmt.Printf("Connecting to %s\n", host)
 		// exit code 255 is ssh connection error
 		if err := cmd.Run(); err != nil && cmd.ProcessState.ExitCode() == 255 {
 			continue
