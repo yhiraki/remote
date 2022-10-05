@@ -155,20 +155,20 @@ func main() {
 			localFileExists = true
 		}
 		rsyncArgs := make([]string, 0, 8)
-		rsyncOptions := []string{"--exclude", "node_modules", "--exclude", ".venv"}
+		for _, fname := range config.ExcludeFiles {
+			rsyncArgs = append(rsyncArgs, "--exclude", fname)
+		}
 
 		if subCmd == "push" {
 			if !localFileExists {
 				return "", nil, errors.New(fmt.Sprintf("File not found: %q", localFile))
 			}
 			rsyncArgs = append(rsyncArgs, "-av", localFile, fmt.Sprintf("%s:%s", host, remoteFile))
-			rsyncArgs = append(rsyncArgs, rsyncOptions...)
 			return "rsync", rsyncArgs, nil
 		}
 
 		if subCmd == "pull" {
 			rsyncArgs = append(rsyncArgs, "-av", "--ignore-existing", fmt.Sprintf("%s:%s", host, remoteFile), localFile)
-			rsyncArgs = append(rsyncArgs, rsyncOptions...)
 			return "rsync", rsyncArgs, nil
 		}
 
