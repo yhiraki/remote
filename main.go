@@ -157,7 +157,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// ssh connect
+	// run command
 	waitSeconds := 1
 	maxRetry := 3
 	for i := 0; i <= maxRetry; i++ {
@@ -175,7 +175,8 @@ func main() {
 			break
 		}
 		fmt.Printf("Connecting to %s\n", host)
-		if err := cmd.Run(); err != nil {
+		// exit code 255 is ssh connection error
+		if err := cmd.Run(); err != nil && cmd.ProcessState.ExitCode() == 255 {
 			continue
 		}
 		break
