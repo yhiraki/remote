@@ -24,6 +24,9 @@ type Config struct {
 	Hostname        string   `json:"hostname"`
 	HostnameCommand string   `json:"hostnameCommand"`
 	ExcludeFiles    []string `json:"excludeFiles"`
+
+func NewConfig () Config {
+	return Config{}
 }
 
 // Find nearest config file path
@@ -119,7 +122,8 @@ func getRemoteHostname(cmd string) (host string) {
 }
 
 func main() {
-	var config Config
+	config := NewConfig()
+
 	parseConfigJson(&config)
 
 	// command line parsing
