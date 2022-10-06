@@ -26,6 +26,36 @@ type Config struct {
 	ExcludeFiles    []string `json:"excludeFiles"`
 }
 
+// Find nearest config file path
+func findConfigFile() (filePath string) {
+	configName := ".remoterc.json"
+	filePath = filepath.Join(home, ".config", "remote", configName)
+	wd := strings.Split(cwd, "/")
+	for ; len(wd) > 0; wd = wd[:len(wd)-1] {
+		path := filepath.Join(wd...)
+		path = filepath.Join("/", path, configName)
+		if s, err := os.Stat(path); err != nil {
+			continue
+		} else if !s.IsDir() {
+			filePath = path
+		}
+		break
+	}
+	return
+}
+
+func parseConfigJson(config *Config) {
+	fp, err := os.Open(findConfigFile())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer fp.Close()
+
+	if err := json.NewDecoder(fp).Decode(&config); err != nil {
+		log.Fatal(err)
+	}
+}
+
 func init() {
 	var err error
 
@@ -45,31 +75,6 @@ func init() {
 		if err = os.MkdirAll(cacheDir, 0o705); err != nil {
 			log.Fatal(err)
 		}
-	}
-}
-
-func parseConfigFile(config *Config) {
-	configName := ".remoterc.json"
-	configFile := filepath.Join(home, ".config", "remote", configName)
-	wd := strings.Split(cwd, "/")
-	for ; len(wd) > 0; wd = wd[:len(wd)-1] {
-		path := filepath.Join(wd...)
-		path = filepath.Join("/", path, configName)
-		if s, err := os.Stat(path); err != nil {
-			continue
-		} else if !s.IsDir() {
-			configFile = path
-		}
-		break
-	}
-	fp, err := os.Open(configFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer fp.Close()
-
-	if err := json.NewDecoder(fp).Decode(&config); err != nil {
-		log.Fatal(err)
 	}
 }
 
@@ -115,7 +120,7 @@ func getRemoteHostname(cmd string) (host string) {
 
 func main() {
 	var config Config
-	parseConfigFile(&config)
+	parseConfigJson(&config)
 
 	// command line parsing
 	isDryRun := flag.Bool("dry-run", false, "dry run")
