@@ -15,24 +15,25 @@ import (
 )
 
 var (
-	home     string
-	cwd      string
-	cacheDir string
+	home string
+	cwd  string
 )
 
 type Config struct {
 	Hostname        string   `json:"hostname"`
 	HostnameCommand string   `json:"hostnameCommand"`
 	ExcludeFiles    []string `json:"excludeFiles"`
+	ConfigDir       string   `json:"configDir"`
+	CacheDir        string   `json:"cacheDir"`
+}
 
-func NewConfig () Config {
-	return Config{}
+func NewConfig() Config {
+	return Config{"", "", []string{}, filepath.Join(home, ".cache", "remote"), filepath.Join(home, ".config", "remote")}
 }
 
 // Find nearest config file path
-func findConfigFile() (filePath string) {
+func findConfigFile() (string, error) {
 	configName := ".remoterc.json"
-	filePath = filepath.Join(home, ".config", "remote", configName)
 	wd := strings.Split(cwd, "/")
 	for ; len(wd) > 0; wd = wd[:len(wd)-1] {
 		path := filepath.Join(wd...)
@@ -40,15 +41,15 @@ func findConfigFile() (filePath string) {
 		if s, err := os.Stat(path); err != nil {
 			continue
 		} else if !s.IsDir() {
-			filePath = path
+			return path, nil
 		}
 		break
 	}
-	return
+	return "", errors.New("Config path not found.")
 }
 
-func parseConfigJson(config *Config) {
-	fp, err := os.Open(findConfigFile())
+func parseConfigJson(fileName string, config *Config) {
+	fp, err := os.Open(fileName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,20 +72,11 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	cacheDir = filepath.Join(home, ".cache/remote")
-	_, err = os.Stat(cacheDir)
-	if err != nil {
-		if err = os.MkdirAll(cacheDir, 0o705); err != nil {
-			log.Fatal(err)
-		}
-	}
 }
 
-func getRemoteHostname(cmd string) (host string) {
-	// get remote hostname and cache
+// get remote hostname and cache
+func getRemoteHostname(cmd string, cacheFile string) (host string) {
 	timeBeforCacheExpies := 24 * time.Hour
-	cacheFile := filepath.Join(cacheDir, "hostname") // TODO: config file の場所によって変える
 	cacheFileState, err := os.Stat(cacheFile)
 	isCacheExpired := true
 	if err == nil {
@@ -124,7 +116,21 @@ func getRemoteHostname(cmd string) (host string) {
 func main() {
 	config := NewConfig()
 
-	parseConfigJson(&config)
+	configFile, err := findConfigFile()
+	if err != nil {
+		// TODO: no magic var remote file name, .remoterc.json
+		configFile = filepath.Join(home, ".config", "remote", ".remoterc.json")
+	}
+	parseConfigJson(configFile, &config)
+
+	// create directories
+	for _, d := range []string{config.CacheDir, config.ConfigDir} {
+		if _, err := os.Stat(d); err != nil {
+			if err = os.MkdirAll(d, 0o705); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
 
 	// command line parsing
 	isDryRun := flag.Bool("dry-run", false, "dry run")
@@ -133,7 +139,7 @@ func main() {
 	// get hostname
 	host := config.Hostname
 	if config.HostnameCommand != "" {
-		host = getRemoteHostname(config.HostnameCommand)
+		host = getRemoteHostname(config.HostnameCommand, filepath.Join(config.CacheDir, "hostname"))
 	}
 
 	// get relative current path
