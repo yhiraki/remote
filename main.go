@@ -148,7 +148,7 @@ func main() {
 	}
 
 	// build command args
-	cmd, cmdArg, err := func(args []string) (string, []string, error) {
+	cmdName, cmdArg, err := func(args []string) (string, []string, error) {
 		// ssh
 
 		if len(args) == 0 {
@@ -206,26 +206,13 @@ func main() {
 	}
 
 	// run command
-	waitSeconds := 1
-	maxRetry := 3
-	for i := 0; i <= maxRetry; i++ {
-		if i > 0 {
-			log.Printf("%s\nRetry after %d seconds.", err, waitSeconds)
-			time.Sleep(time.Second * time.Duration(waitSeconds))
-			waitSeconds *= 2
-		}
-		cmd := exec.Command(cmd, cmdArg...)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if *isDryRun {
-			fmt.Println(cmd.Args)
-			break
-		}
-		// exit code 255 is ssh connection error
-		if err := cmd.Run(); err != nil && cmd.ProcessState.ExitCode() == 255 {
-			continue
-		}
-		break
+	cmd := exec.Command(cmdName, cmdArg...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if *isDryRun {
+		fmt.Println(cmd.Args)
+		return
 	}
+	cmd.Run()
 }
