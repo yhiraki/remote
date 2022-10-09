@@ -163,36 +163,40 @@ func main() {
 
 		// rsync
 
-		localFile := args[1]
-		remoteFile := localFile
-		if localFile[0] != '/' {
-			remoteFile = filepath.Join(cwdRel, localFile)
-		}
-		localFileStat, err := os.Stat(localFile)
-		localFileExists := false
-		if err == nil {
-			if localFileStat.IsDir() && localFile[len(localFile)-1] != '/' {
-				localFile += "/"
-				remoteFile += "/"
-			}
-			localFileExists = true
-		}
-		rsyncArgs := make([]string, 0, 8)
-		for _, fname := range config.ExcludeFiles {
-			rsyncArgs = append(rsyncArgs, "--exclude", fname)
-		}
+		if subCmd == "push" || subCmd == "pull" {
 
-		if subCmd == "push" {
-			if !localFileExists {
-				return "", nil, errors.New(fmt.Sprintf("File not found: %q", localFile))
+			localFile := args[1]
+			remoteFile := localFile
+			if localFile[0] != '/' {
+				remoteFile = filepath.Join(cwdRel, localFile)
 			}
-			rsyncArgs = append(rsyncArgs, "-av", localFile, fmt.Sprintf("%s:%s", host, remoteFile))
-			return "rsync", rsyncArgs, nil
-		}
+			localFileStat, err := os.Stat(localFile)
+			localFileExists := false
+			if err == nil {
+				if localFileStat.IsDir() && localFile[len(localFile)-1] != '/' {
+					localFile += "/"
+					remoteFile += "/"
+				}
+				localFileExists = true
+			}
+			rsyncArgs := make([]string, 0, 8)
+			for _, fname := range config.ExcludeFiles {
+				rsyncArgs = append(rsyncArgs, "--exclude", fname)
+			}
 
-		if subCmd == "pull" {
-			rsyncArgs = append(rsyncArgs, "-av", "--ignore-existing", fmt.Sprintf("%s:%s", host, remoteFile), localFile)
-			return "rsync", rsyncArgs, nil
+			if subCmd == "push" {
+				if !localFileExists {
+					return "", nil, errors.New(fmt.Sprintf("File not found: %q", localFile))
+				}
+				rsyncArgs = append(rsyncArgs, "-av", localFile, fmt.Sprintf("%s:%s", host, remoteFile))
+				return "rsync", rsyncArgs, nil
+			}
+
+			if subCmd == "pull" {
+				rsyncArgs = append(rsyncArgs, "-av", "--ignore-existing", fmt.Sprintf("%s:%s", host, remoteFile), localFile)
+				return "rsync", rsyncArgs, nil
+			}
+
 		}
 
 		return "", nil, errors.New(fmt.Sprintf("%q is not command", subCmd))
