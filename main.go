@@ -20,15 +20,16 @@ var (
 )
 
 type Config struct {
-	Hostname        string   `json:"hostname"`
-	HostnameCommand string   `json:"hostnameCommand"`
-	ExcludeFiles    []string `json:"excludeFiles"`
-	ConfigDir       string   `json:"configDir"`
-	CacheDir        string   `json:"cacheDir"`
+	Hostname           string   `json:"hostname"`
+	HostnameCommand    string   `json:"hostnameCommand"`
+	ExcludeFiles       []string `json:"excludeFiles"`
+	ConfigDir          string   `json:"configDir"`
+	CacheDir           string   `json:"cacheDir"`
+	CacheExpireMinutes int      `json:"cacheExpireMinutes"`
 }
 
 func NewConfig() Config {
-	return Config{"", "", []string{}, filepath.Join(home, ".cache", "remote"), filepath.Join(home, ".config", "remote")}
+	return Config{"", "", []string{}, filepath.Join(home, ".cache", "remote"), filepath.Join(home, ".config", "remote"), 12 * 60}
 }
 
 // Find nearest config file path
@@ -74,8 +75,7 @@ func init() {
 }
 
 // get remote hostname and cache
-func getRemoteHostname(cmd string, cacheFile string) (host string) {
-	timeBeforCacheExpies := 24 * time.Hour
+func getRemoteHostname(cmd string, cacheFile string, timeBeforCacheExpies time.Duration) (host string) {
 	cacheFileState, err := os.Stat(cacheFile)
 	isCacheExpired := true
 	if err == nil {
@@ -138,7 +138,8 @@ func main() {
 	// get hostname
 	host := config.Hostname
 	if config.HostnameCommand != "" {
-		host = getRemoteHostname(config.HostnameCommand, filepath.Join(config.CacheDir, "hostname"))
+		timeBeforCacheExpies := time.Duration(config.CacheExpireMinutes) * time.Minute
+		host = getRemoteHostname(config.HostnameCommand, filepath.Join(config.CacheDir, "hostname"), timeBeforCacheExpies)
 	}
 
 	// get relative current path
