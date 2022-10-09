@@ -32,12 +32,11 @@ func NewConfig() Config {
 }
 
 // Find nearest config file path
-func findConfigFile() (string, error) {
-	configName := ".remoterc.json"
+func findConfigFile(name string) (string, error) {
 	wd := strings.Split(cwd, "/")
 	for ; len(wd) > 0; wd = wd[:len(wd)-1] {
 		path := filepath.Join(wd...)
-		path = filepath.Join("/", path, configName)
+		path = filepath.Join("/", path, name)
 		if s, err := os.Stat(path); err != nil {
 			continue
 		} else if !s.IsDir() {
@@ -116,10 +115,10 @@ func getRemoteHostname(cmd string, cacheFile string) (host string) {
 func main() {
 	config := NewConfig()
 
-	configFile, err := findConfigFile()
+	configName := ".remoterc.json"
+	configFile, err := findConfigFile(configName)
 	if err != nil {
-		// TODO: no magic var remote file name, .remoterc.json
-		configFile = filepath.Join(home, ".config", "remote", ".remoterc.json")
+		configFile = filepath.Join(config.ConfigDir, configName)
 	}
 	parseConfigJson(configFile, &config)
 
