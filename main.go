@@ -29,7 +29,7 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	return Config{"", "", []string{}, filepath.Join(home, ".cache", "remote"), filepath.Join(home, ".config", "remote"), 12 * 60}
+	return Config{"", "", []string{}, filepath.Join(home, ".config", "remote"), filepath.Join(home, ".cache", "remote"), 12 * 60, 20}
 }
 
 // Find nearest config file path
