@@ -117,7 +117,12 @@ func main() {
 
 	configName := ".remoterc.json"
 	configFile, err := findConfigFile(configName)
-	if err != nil {
+	if err == nil {
+		// project local cacheDir
+		config.ConfigDir = filepath.Join(configFile, "..")
+		config.CacheDir = filepath.Join(config.ConfigDir, ".remote")
+	} else {
+		// user global cacheDir and configDir
 		configFile = filepath.Join(config.ConfigDir, configName)
 	}
 	parseConfigJson(configFile, &config)
