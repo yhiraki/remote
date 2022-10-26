@@ -1,1 +1,48 @@
 * remote
+:PROPERTIES:
+:header-args: :eval no
+:END:
+Helper for SSH and Rsync.
+** Usage
+*** Config
+Create config file first.
+
+- =~/.config/remote/.remoterc.json=
+
+or project local
+
+- =/path/to/project/.remoterc.json=
+
+#+begin_src json
+  {
+      "hostname": "10.10.10.10",
+      "excludeFiles": [
+          ".venv",
+          "node_modules"
+      ]
+  }
+#+end_src
+*** CLI
+Do SSH to remote host.
+
+#+begin_src sh
+  remote
+#+end_src
+
+Transfer current directory to remote host.
+
+#+begin_src sh
+  remote push .
+#+end_src
+
+Download a file from remote host.
+
+#+begin_src sh
+  remote pull somefile
+#+end_src
+** Installation
+#+begin_src sh
+  go install github.com/yhiraki/remote@latest
+#+end_src
+** License
+MIT
