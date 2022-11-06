@@ -29,7 +29,15 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	return Config{"", "", []string{}, filepath.Join(home, ".config", "remote"), filepath.Join(home, ".cache", "remote"), 12 * 60, 20}
+	return Config{
+		"",
+		"",
+		[]string{},
+		filepath.Join(home, ".config", "remote"),
+		filepath.Join(home, ".cache", "remote"),
+		12 * 60,
+		20,
+	}
 }
 
 // Find nearest config file path
@@ -75,7 +83,9 @@ func init() {
 }
 
 // get remote hostname and cache
-func getRemoteHostname(cmd string, cacheFile string, timeBeforCacheExpies time.Duration) (host string) {
+func getRemoteHostname(
+	cmd string, cacheFile string, timeBeforCacheExpies time.Duration,
+) (host string) {
 	cacheFileState, err := os.Stat(cacheFile)
 	isCacheExpired := true
 	if err == nil {
@@ -144,7 +154,10 @@ func main() {
 	host := config.Hostname
 	if config.HostnameCommand != "" {
 		timeBeforCacheExpies := time.Duration(config.CacheExpireMinutes) * time.Minute
-		host = getRemoteHostname(config.HostnameCommand, filepath.Join(config.CacheDir, "hostname"), timeBeforCacheExpies)
+		host = getRemoteHostname(
+			config.HostnameCommand,
+			filepath.Join(config.CacheDir, "hostname"),
+			timeBeforCacheExpies)
 	}
 
 	// get relative current path
