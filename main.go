@@ -26,6 +26,7 @@ type Config struct {
 	ConfigDir          string   `json:"configDir"`
 	CacheDir           string   `json:"cacheDir"`
 	CacheExpireMinutes int      `json:"cacheExpireMinutes"`
+	StartupWaitSeconds int      `json:"startupWaitSeconds"`
 }
 
 func NewConfig() Config {
@@ -168,16 +169,21 @@ func main() {
 
 	// build command args
 	cmdName, cmdArg, err := func(args []string) (string, []string, error) {
-		// ssh
-
-		if len(args) == 0 {
-			return "ssh", []string{host, "-t", fmt.Sprintf("cd %s; exec %s", cwdRel, "$SHELL")}, nil
+		subCmd := "sh"
+		subCmdArgs := []string{}
+		if len(args) > 0 {
+			subCmd = args[0]
+			subCmdArgs = args[1:]
 		}
 
-		subCmd := args[0]
+		// ssh
 
-		if subCmd == "sh" {
-			return "ssh", []string{host, "-t", fmt.Sprintf("cd %s; exec %s", cwdRel, strings.Join(args[1:], " "))}, nil
+		if subCmd == "" || subCmd == "sh" {
+			shCmd := strings.Join(subCmdArgs, " ")
+			if shCmd == "" {
+				shCmd = "$SHELL"
+			}
+			return "ssh", []string{host, "-t", fmt.Sprintf("cd %s; exec %s", cwdRel, shCmd)}, nil
 		}
 
 		// rsync
