@@ -57,16 +57,17 @@ func findConfigFile(name string) (string, error) {
 	return "", errors.New("Config path not found.")
 }
 
-func parseConfigJson(fileName string, config *Config) {
+func parseConfigJson(fileName string, config *Config) error {
 	fp, err := os.Open(fileName)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer fp.Close()
 
 	if err := json.NewDecoder(fp).Decode(&config); err != nil {
-		log.Fatal(err)
+		return err
 	}
+	return nil
 }
 
 func init() {
@@ -86,7 +87,7 @@ func init() {
 // get remote hostname and cache
 func getRemoteHostname(
 	cmd string, cacheFile string, timeBeforCacheExpies time.Duration,
-) (host string) {
+) (string, error) {
 	cacheFileState, err := os.Stat(cacheFile)
 	isCacheExpired := true
 	if err == nil {
@@ -95,7 +96,7 @@ func getRemoteHostname(
 	if err != nil || isCacheExpired {
 		f, err := os.Create(cacheFile)
 		if err != nil {
-			log.Fatal(err)
+			return "", errors.New("Could not create hostname cachefile")
 		}
 		defer f.Close()
 
@@ -103,7 +104,7 @@ func getRemoteHostname(
 		shcmd := strings.Split(cmd, "\n")[0]
 		out, err := exec.Command("sh", "-c", shcmd).Output()
 		if err != nil {
-			log.Fatal(err)
+			return "", errors.New("Could not get hostname")
 		}
 		f.WriteString(strings.TrimSuffix(string(out), "\n"))
 	}
@@ -111,19 +112,19 @@ func getRemoteHostname(
 	// get cached remote hostname
 	f, err := os.Open(cacheFile)
 	if err != nil {
-		log.Fatal(err)
+		return "", errors.New(fmt.Sprintf("Could not open hostname cachefile: %s", cacheFile))
 	}
 	defer f.Close()
 	sc := bufio.NewScanner(f)
 	if !sc.Scan() {
-		log.Fatal("Host not cached")
+		return "", errors.New("Host not cached")
 	}
 
-	host = string(sc.Text())
-	return
+	host := string(sc.Text())
+	return host, nil
 }
 
-func main() {
+func _main() error {
 	config := NewConfig()
 
 	configName := ".remoterc.json"
@@ -136,13 +137,15 @@ func main() {
 		// user global cacheDir and configDir
 		configFile = filepath.Join(config.ConfigDir, configName)
 	}
-	parseConfigJson(configFile, &config)
+	if err := parseConfigJson(configFile, &config); err != nil {
+		return err
+	}
 
 	// create directories
 	for _, d := range []string{config.CacheDir, config.ConfigDir} {
 		if _, err := os.Stat(d); err != nil {
 			if err = os.MkdirAll(d, 0o705); err != nil {
-				log.Fatal(err)
+				return err
 			}
 		}
 	}
@@ -155,16 +158,19 @@ func main() {
 	host := config.Hostname
 	if config.HostnameCommand != "" {
 		timeBeforCacheExpies := time.Duration(config.CacheExpireMinutes) * time.Minute
-		host = getRemoteHostname(
+		host, err = getRemoteHostname(
 			config.HostnameCommand,
 			filepath.Join(config.CacheDir, "hostname"),
 			timeBeforCacheExpies)
+		if err != nil {
+			return err
+		}
 	}
 
 	// get relative current path
 	cwdRel, err := filepath.Rel(home, cwd)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// build command args
@@ -227,7 +233,7 @@ func main() {
 		return "", nil, errors.New(fmt.Sprintf("%q is not command", subCmd))
 	}(flag.Args())
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// run command
@@ -237,7 +243,14 @@ func main() {
 	cmd.Stderr = os.Stderr
 	if *isDryRun {
 		fmt.Println(cmd.Args)
-		return
+		return nil
 	}
 	cmd.Run()
+	return nil
+}
+
+func main() {
+	if err := _main(); err != nil {
+		fmt.Println(err)
+	}
 }
