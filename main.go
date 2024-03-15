@@ -138,6 +138,7 @@ func _main() error {
 		configFile = filepath.Join(config.ConfigDir, configName)
 	}
 	if err := parseConfigJson(configFile, &config); err != nil {
+		log.Printf("%s could not parsed.", configFile)
 		return err
 	}
 
