@@ -43,16 +43,18 @@ func NewConfig() Config {
 
 // Find nearest config file path
 func findConfigFile(name string) (string, error) {
-	wd := strings.Split(cwd, "/")
-	for ; len(wd) > 0; wd = wd[:len(wd)-1] {
-		path := filepath.Join(wd...)
-		path = filepath.Join("/", path, name)
-		if s, err := os.Stat(path); err != nil {
-			continue
-		} else if !s.IsDir() {
+	currentDir := cwd
+	for {
+		path := filepath.Join(currentDir, name)
+		if s, err := os.Stat(path); err == nil && !s.IsDir() {
 			return path, nil
 		}
-		break
+
+		parentDir := filepath.Dir(currentDir)
+		if parentDir == currentDir { // If reached root directory
+			break
+		}
+		currentDir = parentDir
 	}
 	return "", errors.New("Config path not found.")
 }
