@@ -196,7 +196,7 @@ func _main() error {
 			if shCmd == "" {
 				shCmd = "$SHELL"
 			}
-			return "ssh", []string{host, "-t", fmt.Sprintf("cd %s; exec %s", cwdRel, shCmd)}, nil
+			return "ssh", []string{host, "-t", fmt.Sprintf("cd '%s'; exec %s", cwdRel, shCmd)}, nil
 		}
 
 		// rsync
