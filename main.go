@@ -102,7 +102,13 @@ func getRemoteHostname(
 
 		// get remote hostname
 		shcmd := strings.Split(cmd, "\n")[0]
-		out, err := exec.Command("sh", "-c", shcmd).Output()
+		parts := strings.Fields(shcmd) // コマンドと引数をスペースで分割
+		if len(parts) == 0 {
+			return "", errors.New("Hostname command is empty")
+		}
+		cmdName := parts[0]
+		cmdArgs := parts[1:]
+		out, err := exec.Command(cmdName, cmdArgs...).Output()
 		if err != nil {
 			return "", errors.New("Could not get hostname")
 		}
