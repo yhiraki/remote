@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	home string
-	cwd  string
+	home    string
+	cwd     string
+	version = "dev" // set by build-time ldflags
 )
 
 type Config struct {
@@ -217,7 +218,13 @@ func _main() error {
 	// command line parsing
 	isDryRun := flag.Bool("dry-run", false, "dry run")
 	isVerbose := flag.Bool("verbose", false, "enable verbose logging")
+	showVersion := flag.Bool("version", false, "print version information")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return nil
+	}
 
 	// get hostname
 	host := config.Hostname
