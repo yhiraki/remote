@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -90,46 +89,50 @@ func init() {
 func getRemoteHostname(
 	cmd string, cacheFile string, timeBeforCacheExpies time.Duration,
 ) (string, error) {
+	// First, try to read from a valid cache
 	cacheFileState, err := os.Stat(cacheFile)
-	isCacheExpired := true
-	if err == nil {
-		isCacheExpired = cacheFileState.ModTime().Add(timeBeforCacheExpies).Before(time.Now())
-	}
-	if err != nil || isCacheExpired {
-		f, err := os.Create(cacheFile)
-		if err != nil {
-			return "", errors.New("Could not create hostname cachefile")
+	if err == nil { // Cache file exists
+		isCacheExpired := cacheFileState.ModTime().Add(timeBeforCacheExpies).Before(time.Now())
+		if !isCacheExpired {
+			content, err := os.ReadFile(cacheFile)
+			if err == nil {
+				host := strings.TrimSpace(string(content))
+				if host != "" {
+					// Cache is valid, not expired, and not empty.
+					return host, nil
+				}
+			}
 		}
-		defer f.Close()
-
-		// get remote hostname
-		shcmd := strings.Split(cmd, "\n")[0]
-		parts := strings.Fields(shcmd) // コマンドと引数をスペースで分割
-		if len(parts) == 0 {
-			return "", errors.New("Hostname command is empty")
-		}
-		cmdName := parts[0]
-		cmdArgs := parts[1:]
-		out, err := exec.Command(cmdName, cmdArgs...).Output()
-		if err != nil {
-			return "", errors.New("Could not get hostname")
-		}
-		f.WriteString(strings.TrimSuffix(string(out), "\n"))
 	}
 
-	// get cached remote hostname
-	f, err := os.Open(cacheFile)
+	// If cache is non-existent, expired, or empty, fetch the hostname by running the command
+	shcmd := strings.Split(cmd, "\n")[0]
+	parts := strings.Fields(shcmd)
+	if len(parts) == 0 {
+		return "", errors.New("Hostname command is empty")
+	}
+	cmdName := parts[0]
+	cmdArgs := parts[1:]
+	out, err := exec.Command(cmdName, cmdArgs...).Output()
 	if err != nil {
-		return "", errors.New(fmt.Sprintf("Could not open hostname cachefile: %s", cacheFile))
-	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	if !sc.Scan() {
-		return "", errors.New("Host not cached")
+		// If command fails, remove the potentially empty/stale cache file to force refetch next time.
+		os.Remove(cacheFile)
+		return "", errors.New("Could not get hostname from command")
 	}
 
-	host := string(sc.Text())
-	return host, nil
+	hostname := strings.TrimSpace(string(out))
+	if hostname == "" {
+		os.Remove(cacheFile)
+		return "", errors.New("Hostname command returned an empty string")
+	}
+
+	// Write the newly fetched hostname to the cache file
+	err = os.WriteFile(cacheFile, []byte(hostname), 0644)
+	if err != nil {
+		return "", fmt.Errorf("Could not write to hostname cachefile: %w", err)
+	}
+
+	return hostname, nil
 }
 
 func _main() error {
