@@ -202,7 +202,9 @@ func _main() error {
 		// rsync
 
 		if subCmd == "push" || subCmd == "pull" {
-
+			if len(args) < 2 {
+				return "", nil, errors.New(fmt.Sprintf("Usage: remote %s <file_path>", subCmd))
+			}
 			localFile := args[1]
 			remoteFile := localFile
 			if localFile[0] != '/' {
