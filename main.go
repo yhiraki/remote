@@ -219,6 +219,7 @@ func _main() error {
 	isDryRun := flag.Bool("dry-run", false, "dry run")
 	isVerbose := flag.Bool("verbose", false, "enable verbose logging")
 	showVersion := flag.Bool("version", false, "print version information")
+	isBackground := flag.Bool("background", false, "run tunnel in background")
 	flag.Parse()
 
 	if *showVersion {
@@ -303,6 +304,25 @@ func _main() error {
 				return "rsync", rsyncArgs, nil
 			}
 
+		}
+
+		// tunnel
+		if subCmd == "tunnel" {
+			if len(subCmdArgs) == 0 {
+				return "", nil, errors.New("Usage: remote tunnel <port1> [port2]...")
+			}
+			sshArgs := []string{"-N"}
+			if *isBackground {
+				sshArgs = append(sshArgs, "-f")
+			}
+			for _, port := range subCmdArgs {
+				sshArgs = append(sshArgs, "-L", fmt.Sprintf("%s:localhost:%s", port, port))
+			}
+			sshArgs = append(sshArgs, host)
+			if *isVerbose {
+				log.Printf("[DEBUG] Executing SSH tunnel command: %s %v", "ssh", sshArgs)
+			}
+			return "ssh", sshArgs, nil
 		}
 
 		return "", nil, errors.New(fmt.Sprintf("%q is not command", subCmd))
