@@ -248,12 +248,18 @@ func _main() error {
 	}
 
 	// build command args
-	cmdName, cmdArg, err := func(args []string) (string, []string, error) {
+	cmdName, cmdArg, err := func(host string, args []string) (string, []string, error) {
 		subCmd := "sh"
 		subCmdArgs := []string{}
 		if len(args) > 0 {
 			subCmd = args[0]
 			subCmdArgs = args[1:]
+		}
+
+		// ip
+		if subCmd == "ip" {
+			fmt.Println(host)
+			return "", nil, nil
 		}
 
 		// ssh
@@ -326,9 +332,13 @@ func _main() error {
 		}
 
 		return "", nil, errors.New(fmt.Sprintf("%q is not command", subCmd))
-	}(flag.Args())
+	}(host, flag.Args())
 	if err != nil {
 		return err
+	}
+
+	if cmdName == "" {
+		return nil
 	}
 
 	// run command
