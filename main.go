@@ -188,6 +188,18 @@ func getRemoteHostname(
 	return hostname, nil
 }
 
+
+type stringSlice []string
+
+func (i *stringSlice) String() string {
+	return fmt.Sprintf("%v", *i)
+}
+
+func (i *stringSlice) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
 func _main() error {
 	config := NewConfig()
 
@@ -216,6 +228,9 @@ func _main() error {
 	}
 
 	// command line parsing
+	var envVars stringSlice
+	flag.Var(&envVars, "e", "set environment variable (e.g. -e KEY=VALUE)")
+	flag.Var(&envVars, "env", "set environment variable (e.g. --env KEY=VALUE)")
 	isDryRun := flag.Bool("dry-run", false, "dry run")
 	isVerbose := flag.Bool("verbose", false, "enable verbose logging")
 	showVersion := flag.Bool("version", false, "print version information")
@@ -269,7 +284,22 @@ func _main() error {
 			if shCmd == "" {
 				shCmd = "$SHELL"
 			}
-			return "ssh", []string{host, "-t", fmt.Sprintf("cd '%s'; exec %s", cwdRel, shCmd)}, nil
+			envCmd := ""
+			if len(envVars) > 0 {
+				var quotedEnvVars []string
+				for _, envVar := range envVars {
+					quotedEnvVars = append(quotedEnvVars, fmt.Sprintf("'%s'", envVar))
+				}
+				envCmd = "env " + strings.Join(quotedEnvVars, " ") + " "
+			}
+			finalCmd := ""
+			if shCmd == "$SHELL" {
+				finalCmd = fmt.Sprintf("cd '%s'; exec %s%s", cwdRel, envCmd, shCmd)
+			} else {
+				escapedShCmd := strings.ReplaceAll(shCmd, "'", "'\\''")
+				finalCmd = fmt.Sprintf("cd '%s'; exec %s sh -c '%s'", cwdRel, envCmd, escapedShCmd)
+			}
+			return "ssh", []string{host, "-t", finalCmd}, nil
 		}
 
 		// rsync
