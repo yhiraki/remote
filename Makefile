@@ -1,17 +1,13 @@
-# Get the version from the latest git tag
-VERSION := $(shell git describe --tags --always)
-# Set the linker flags to inject the version
-LDFLAGS := -ldflags="-X main.version=${VERSION}"
+GOBINARY=remote
+GOBUILD=go build
 
-.PHONY: build
+all: build
+
 build:
-	@echo "==> Building remote version ${VERSION}..."
-	@go build ${LDFLAGS} -o remote .
+	$(GOBUILD) -o $(GOBINARY)
 
-.PHONY: install
-install:
-	@go install ${LDFLAGS}
-
-.PHONY: clean
 clean:
-	@rm -f remote
+	$(GOBUILD) clean
+	rm -f $(GOBINARY)
+
+.PHONY: all build clean

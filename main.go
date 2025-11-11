@@ -9,14 +9,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 )
 
 var (
-	home    string
-	cwd     string
-	version = "dev" // set by build-time ldflags
+	home string
+	cwd  string
 )
 
 type Config struct {
@@ -142,18 +142,18 @@ func getRemoteHostname(
 	cmdName := parts[0]
 	cmdArgs := parts[1:]
 	out, err := exec.Command(cmdName, cmdArgs...).Output()
-			if err != nil {
-				// If command fails, remove the potentially empty/stale cache file to force refetch next time.
-				if isVerbose {
-					log.Printf("[ERROR] Command execution failed. Error: %v", err)
-					if exitErr, ok := err.(*exec.ExitError); ok && len(exitErr.Stderr) > 0 {
-						log.Printf("[ERROR] Command Stderr: %s", strings.TrimSpace(string(exitErr.Stderr)))
-					}
-					log.Printf("[DEBUG] Removing stale cache file: %s", cacheFile)
-				}
-				os.Remove(cacheFile)
-				return "", errors.New("Could not get hostname from command")
+	if err != nil {
+		// If command fails, remove the potentially empty/stale cache file to force refetch next time.
+		if isVerbose {
+			log.Printf("[ERROR] Command execution failed. Error: %v", err)
+			if exitErr, ok := err.(*exec.ExitError); ok && len(exitErr.Stderr) > 0 {
+				log.Printf("[ERROR] Command Stderr: %s", strings.TrimSpace(string(exitErr.Stderr)))
 			}
+			log.Printf("[DEBUG] Removing stale cache file: %s", cacheFile)
+		}
+		os.Remove(cacheFile)
+		return "", errors.New("Could not get hostname from command")
+	}
 	if isVerbose {
 		log.Printf("[DEBUG] Command executed successfully.")
 		log.Printf("[DEBUG] Raw command output: \"%s\"", strings.TrimSpace(string(out)))
@@ -187,7 +187,6 @@ func getRemoteHostname(
 	}
 	return hostname, nil
 }
-
 
 type stringSlice []string
 
@@ -238,7 +237,11 @@ func _main() error {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println(version)
+		if info, ok := debug.ReadBuildInfo(); ok {
+			fmt.Println(info.Main.Version)
+		} else {
+			fmt.Println("version not found")
+		}
 		return nil
 	}
 
@@ -290,7 +293,7 @@ func _main() error {
 				for _, envVar := range envVars {
 					quotedEnvVars = append(quotedEnvVars, fmt.Sprintf("'%s'", envVar))
 				}
-				envCmd = "env " + strings.Join(quotedEnvVars, " ") + " "
+			envCmd = "env " + strings.Join(quotedEnvVars, " ") + " "
 			}
 			finalCmd := ""
 			if shCmd == "$SHELL" {
@@ -306,7 +309,7 @@ func _main() error {
 
 		if subCmd == "push" || subCmd == "pull" {
 			if len(args) < 2 {
-				return "", nil, errors.New(fmt.Sprintf("Usage: remote %s <file_path>", subCmd))
+				return "", nil, fmt.Errorf("Usage: remote %s <file_path>", subCmd)
 			}
 			localFile := args[1]
 			remoteFile := localFile
@@ -329,7 +332,7 @@ func _main() error {
 
 			if subCmd == "push" {
 				if !localFileExists {
-					return "", nil, errors.New(fmt.Sprintf("File not found: %q", localFile))
+					return "", nil, fmt.Errorf("File not found: %q", localFile)
 				}
 				rsyncArgs = append(rsyncArgs, "-av", localFile, fmt.Sprintf("%s:%s", host, remoteFile))
 				return "rsync", rsyncArgs, nil
@@ -361,7 +364,7 @@ func _main() error {
 			return "ssh", sshArgs, nil
 		}
 
-		return "", nil, errors.New(fmt.Sprintf("%q is not command", subCmd))
+		return "", nil, fmt.Errorf("%q is not command", subCmd)
 	}(host, flag.Args())
 	if err != nil {
 		return err
@@ -380,7 +383,9 @@ func _main() error {
 		fmt.Println(cmd.Args)
 		return nil
 	}
-	cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return err
+	}
 	return nil
 }
 
